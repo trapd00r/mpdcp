@@ -1,0 +1,86 @@
+#!/usr/bin/perl
+our $APP     = 'cpmpd';
+our $VERSION = 0.30;
+
+use strict;
+use Getopt::Long;
+use Pod::Usage;
+use Cwd;
+use File::Find::Rule;
+use File::LsColor qw(ls_color);
+use File::Basename;
+
+our $target    = getcwd();
+my $base       = $ENV{XDG_MUSIC_DIR};
+my $user       = $ENV{MPD_USER};
+my $host       = $ENV{MPD_HOST};
+my $port       = $ENV{MPD_PORT};
+my $scp        = '/bin/cp';
+
+chomp(my $file = `mpc -h $host --format %file%|head -1`);
+my $path       = "$base/$file";
+
+my ($basename) = $path =~ m;.+/(.+)$;;
+my ($album)    = $path =~ m;(.+)/.+$;;
+my ($albname)  = $album =~ m;.+/(.+)$;;
+
+GetOptions(
+  'album'           => \&get_album,
+  'track'           => \&get_track,
+  'dest=s'          => sub { shift; $target = -d $_[0] ? $_[0] : $target },
+
+  'help'            => sub { pod2usage(verbose => 1); exit(0); },
+  'man'             => sub { pod2usage(verbose => 3); exit(0); },
+);
+
+get_track() unless @ARGV;
+
+sub get_album { transfer($album); }
+sub get_track { transfer($path); }
+
+sub transfer {
+  my @files;
+  for(@_) {
+    if($_ =~ m/.+[.](mp3|flac)$/) {
+      push(@files, $_);
+    }
+    else { # album
+      my $dir = (-d $_[0] ? $_[0] : die "No songs and no album\n");
+      @files = File::Find::Rule->file()
+                               ->name('*.mp3', '*.flac')
+                               ->in($dir);
+    }
+  }
+
+  for(@files) {
+    # shell-escape
+    $_ =~ s/([;<>\*\|`&\$!#\(\)\[\]\{\}:'"])/\\$1/g;
+    system("$scp -r  \"$_\" $target");
+    printf("'%s' -> '%s'\n", ls_color(basename($_)), ls_color($target)) unless $?;
+  }
+}
+
+=pod
+
+=head1 NAME
+
+mpdcp - copy music from a (remote) MPD server
+
+=head1 DESCRIPTION
+
+copy music from a MPD server elsewhere.
+
+=head1 OPTIONS
+
+  --dest    set target destination
+  --album   copy the now playing album to target
+  --track   copy the now playing track to target
+
+  --help    show the help and exit
+  --man     show the manpage and exit
+
+=head1 COPYRIGHT
+
+Copyright (C) Magnus Woldrich 2010, 2021-
+
+=cut
