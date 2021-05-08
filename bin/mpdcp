@@ -1,6 +1,6 @@
 #!/usr/bin/perl
-our $APP     = 'cpmpd';
-our $VERSION = 0.30;
+our $APP     = 'mpdcp';
+our $VERSION = 0.32;
 
 use strict;
 use Getopt::Long;
